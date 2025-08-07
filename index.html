@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kappalemäärälaskuri</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
+    textarea { width: 100%; height: 200px; margin-bottom: 1rem; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; }
+    #tulos { margin-top: 1rem; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Kappalemäärien laskuri</h1>
+  <p>Liitä alle teksti (esim. OCR-kuvasta), ja ohjelma laskee kaikki viisinumeroiset kappalemäärät riveiltä, jotka alkavat kirjaimella "A".</p>
+
+  <textarea id="inputText" placeholder="Liitä teksti tähän..."></textarea>
+  <button onclick="laskeKappaleet()">Laske kappalemäärät</button>
+  <div id="tulos"></div>
+
+  <script>
+    function laskeKappaleet() {
+      const teksti = document.getElementById("inputText").value;
+      const rivit = teksti.split("\n");
+      let summa = 0;
+
+      rivit.forEach(rivi => {
+        rivi = rivi.trim();
+        if (rivi.startsWith("A")) {
+          const osumat = rivi.match(/\b\d{5}\b/g); // Viisinumeroiset
+          if (osumat) {
+            osumat.forEach(luku => {
+              summa += parseInt(luku, 10);
+            });
+          }
+        }
+      });
+
+      document.getElementById("tulos").innerText = `Löydettyjen kappalemäärien summa: ${summa}`;
+    }
+  </script>
+</body>
+</html>
