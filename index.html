@@ -13,10 +13,13 @@
 </head>
 <body>
   <h1>Kappalemäärien laskuri</h1>
-  <p>Liitä alle teksti (esim. OCR-kuvasta), ja ohjelma laskee kaikki viisinumeroiset kappalemäärät riveiltä, jotka alkavat kirjaimella "A".</p>
+  <p>Liitä alle teksti, ohjelma laskee kaikki viisinumeroiset tai nelinumeroiset kappalemäärät riveiltä, jotka alkavat kirjaimella "A".
+    Vain ensimmäiset numerot lasketaan, joten esim postinumeroa ei lasketa mukaan.
+  </p>
 
   <textarea id="inputText" placeholder="Liitä teksti tähän..."></textarea>
   <button onclick="laskeKappaleet()">Laske kappalemäärät</button>
+  <button onclick="tyhjennaKentta()">Tyhjennä kenttä</button>
   <div id="tulos"></div>
 
   <script>
@@ -24,20 +27,39 @@
       const teksti = document.getElementById("inputText").value;
       const rivit = teksti.split("\n");
       let summa = 0;
+      let varhaisSumma = 0;
+      let pakettiSumma = 0;
+      let pakettiMaara = 0;
 
       rivit.forEach(rivi => {
         rivi = rivi.trim();
         if (rivi.startsWith("A")) {
-          const osumat = rivi.match(/\b\d{5}\b/g); // Viisinumeroiset
-          if (osumat) {
-            osumat.forEach(luku => {
-              summa += parseInt(luku, 10);
-            });
+          const osuma = rivi.match(/\b\d{4,5}\b/); // Vain ensimm\u00e4inen 4- tai 5-numeroinen
+          if (osuma) {
+            const arvo = parseInt(osuma[0], 10);
+            summa += arvo;
+
+            if (rivi.includes("KULJETUS KAHMA")) {
+              varhaisSumma += arvo;
+            }
+
+            if (rivi.includes("PAKETTI")) {
+              pakettiSumma += arvo;
+              pakettiMaara += 1;
+            }
           }
         }
       });
 
-      document.getElementById("tulos").innerText = `Löydettyjen kappalemäärien summa: ${summa}`;
+      document.getElementById("tulos").innerHTML = `
+        <p>Löydettyjen kappalemäärien summa: <strong>${summa}</strong></p>
+        <p>Varhaisjakelun kappalemäärä: <strong>${varhaisSumma}</strong></p>
+        <p>Pakettien yhteiskappalemäärä: <strong>${pakettiSumma}</strong> (${pakettiMaara} pakettia)</p>
+      `;
+    }
+        function tyhjennaKentta() {
+      document.getElementById("inputText").value = "";
+      document.getElementById("tulos").innerHTML = "";
     }
   </script>
 </body>
