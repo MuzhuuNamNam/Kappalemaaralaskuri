@@ -1,98 +1,95 @@
 <!DOCTYPE html>
 <html lang="fi">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Työkalut</title>
+  <title>Kappalemäärän laskuri & PDF-yhdistäjä</title>
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
-      background: #f0f0e8;
+      background: beige;
       padding: 20px;
-    }
-    .toolbar {
-      margin-bottom: 20px;
-    }
-    button {
-      margin-right: 10px;
-      padding: 10px 15px;
-      font-size: 16px;
-    }
-    .tool-section {
-      display: none;
-    }
-    .visible {
-      display: block;
     }
     textarea {
       width: 100%;
       height: 200px;
-      font-family: monospace;
+      font-size: 16px;
       margin-bottom: 10px;
     }
-    #drop-area {
-      border: 3px dashed #007bff;
-      border-radius: 20px;
-      width: 400px;
-      height: 200px;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      color: #007bff;
-      font-size: 18px;
-      margin-bottom: 20px;
-      cursor: pointer;
-    }
-    #merge-btn {
+    button {
+      margin-right: 10px;
       padding: 10px 20px;
-      font-size: 18px;
-      border: none;
-      border-radius: 10px;
-      background-color: #28a745;
-      color: white;
-      cursor: pointer;
+      font-size: 16px;
     }
-    #merge-btn:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
+    pre {
+      background: #eee;
+      padding: 10px;
+    }
+    #drop-area, #drop-text {
+      border: 2px dashed #007bff;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      background: #fff;
+      color: #007bff;
+      cursor: pointer;
     }
   </style>
 </head>
+
 <body>
-  <div class="toolbar">
-    <button onclick="showTool('kappalelaskuri')">Kappalemäärälaskuri</button>
-    <button onclick="showTool('pdfyhdistaja')">PDF-yhdistäjä</button>
-  </div>
+  <h1>Kappalemäärän laskuri & PDF-yhdistäjä</h1>
 
-  <div id="kappalelaskuri" class="tool-section visible">
-    <h2>Kappalemäärälaskuri</h2>
-    <textarea id="textInput" placeholder="Liitä teksti tähän..."></textarea>
-    <br />
-    <button onclick="analyzeText()">Laske kappalemäärät</button>
-    <button onclick="clearText()">Tyhjennä kenttä</button>
-    <pre id="result"></pre>
-  </div>
+  <div id="drop-text">Pudota tekstitiedosto tähän tai klikkaa valitaksesi</div>
+  <input type="file" id="fileInputText" accept=".txt,.001,.000,.log" style="display:none" />
+  <textarea id="textInput" placeholder="Liitä tai pudota teksti tähän..."></textarea>
+  <button onclick="analyzeText()">Laske kappalemäärät</button>
+  <button onclick="clearText()">Tyhjennä</button>
 
-  <div id="pdfyhdistaja" class="tool-section">
-    <h2>PDF-yhdistäjä</h2>
-    <div id="drop-area">
-      Klikkaa tai pudota PDF-tiedostoja tähän
-      <input type="file" id="fileElem" multiple accept="application/pdf" style="display:none" />
-    </div>
-    <button id="merge-btn" disabled>Yhdistä PDF-tiedostot</button>
+  <pre id="output"></pre>
+
+  <hr>
+
+  <h2>PDF-yhdistäjä</h2>
+  <div id="drop-area">Klikkaa tai pudota PDF-tiedostoja tähän
+    <input type="file" id="fileElem" multiple accept="application/pdf" style="display:none" />
   </div>
+  <button id="merge-btn" disabled>Yhdistä PDF-tiedostot</button>
 
   <script>
-    function showTool(toolId) {
-      document.querySelectorAll('.tool-section').forEach(section => section.classList.remove('visible'));
-      document.getElementById(toolId).classList.add('visible');
-    }
+    const textDrop = document.getElementById('drop-text');
+    const fileInputText = document.getElementById('fileInputText');
 
-    function clearText() {
-      document.getElementById("textInput").value = "";
-      document.getElementById("result").textContent = "";
+    textDrop.addEventListener('click', () => fileInputText.click());
+    textDrop.addEventListener('dragover', e => { e.preventDefault(); textDrop.style.background = '#e0e0ff'; });
+    textDrop.addEventListener('dragleave', () => { textDrop.style.background = '#fff'; });
+    textDrop.addEventListener('drop', e => {
+      e.preventDefault();
+      textDrop.style.background = '#fff';
+      const file = e.dataTransfer.files[0];
+      handleTextFile(file);
+    });
+
+    fileInputText.addEventListener('change', () => {
+      const file = fileInputText.files[0];
+      handleTextFile(file);
+    });
+
+    function handleTextFile(file) {
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const text = reader.result;
+          if (typeof text === "string" && text.trim().length > 0) {
+            document.getElementById("textInput").value = text;
+          } else {
+            alert("Tiedostoa ei voitu lukea tekstinä.");
+          }
+        };
+        reader.readAsText(file, "UTF-8");
+      }
     }
 
     function analyzeText() {
@@ -100,95 +97,90 @@
       const lines = text.split("\n");
 
       let total = 0;
-      let early = 0;
-      let earlyCount = 0;
-      let packageTotal = 0;
-      let packageCount = 0;
-      let deliveryTotal = 0;
-      let deliveryCount = 0;
-      let addressCount = 0;
-      let firstAFound = false;
+      let osoitteet = 0;
+      let varhais = 0, varhaisRivit = 0;
+      let paketit = 0, pakettiRivit = 0;
+      let dLkm = 0, dRivit = 0;
 
-      for (const line of lines) {
-        const trimmed = line.trim();
+      let aAloitettu = false;
 
-        if (!firstAFound && /^A/.test(trimmed)) {
-          firstAFound = true;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Osoitteiden yhteismäärä E ennen ensimmäistä A-riviä
+        if (!aAloitettu && line.startsWith("E")) {
+          osoitteet++;
+          continue;
         }
 
-        if (!firstAFound && /^E/.test(trimmed)) {
-          addressCount++;
+        // A-tunniste alkaa, ei lasketa E enää
+        if (line.startsWith("A")) {
+          aAloitettu = true;
+
+          // Kappalemäärä etsiminen (4-5 numeroa)
+          const match = line.match(/\b(\d{4,5})\b/);
+          if (!match) continue;
+          const luku = parseInt(match[1]);
+
+          if (line.includes("KULJETUS KAHMA") || line.includes("KULJETUS JOUTSA")) {
+            varhais += luku;
+            varhaisRivit++;
+          } else if (line.includes("PAKETTI")) {
+            paketit += luku;
+            pakettiRivit++;
+          }
+
+          continue;
         }
 
-        if (/^A/.test(trimmed)) {
-          const match = trimmed.match(/\b(\d{4,5})\b/);
-          if (match) {
-            total += parseInt(match[1]);
-          }
-
-          if (/KULJETUS (KAHMA|JOUTSA)/.test(trimmed)) {
-            const ematch = trimmed.match(/\b(\d{4,5})\b/);
-            if (ematch) {
-              early += parseInt(ematch[1]);
-              earlyCount++;
-            }
-          }
-
-          if (/PAKETTI/.test(trimmed)) {
-            const pmatch = trimmed.match(/\b(\d{4,5})\b/);
-            if (pmatch) {
-              packageTotal += parseInt(pmatch[1]);
-              packageCount++;
-            }
-          }
-        }
-
-        if (/^D/.test(trimmed) && /KULJETUS KAHMA/.test(trimmed)) {
-          const dmatch = trimmed.match(/\b(\d{4,5})\b/);
-          if (dmatch) {
-            deliveryTotal += parseInt(dmatch[1]);
-            deliveryCount++;
-          }
+        // D-rivit A:n jälkeen
+        if (aAloitettu && line.startsWith("D") && (line.includes("KULJETUS KAHMA") || line.includes("KULJETUS JOUTSA"))) {
+          const match = line.match(/\b(\d{4,5})\b/);
+          if (!match) continue;
+          const luku = parseInt(match[1]);
+          dLkm += luku;
+          dRivit++;
         }
       }
 
-      let output = "";
-      if (addressCount > 0) output += `Osoitteiden yhteismäärä: ${addressCount}\n`;
-      if (early > 0) output += `Varhaisjakelun kappalemäärä: ${early} (${earlyCount} lähetystä)\n`;
-      if (packageTotal > 0) output += `Pakettien yhteiskappalemäärä: ${packageTotal} (${packageCount} pakettia)\n`;
-      if (deliveryTotal > 0) output += `Heittolaatikot yhteensä: ${deliveryTotal} (${deliveryCount} lähetystä)\n`;
+      total = osoitteet + varhais + paketit + dLkm;
 
-      const totalSum = addressCount + early + packageTotal + deliveryTotal;
-	  output += `YHTEISMÄÄRÄ: ${totalSum}\n`;
+      const output = `Osoitteet: ${osoitteet} kpl
+Varhaisjakelu: ${varhais} kpl (${varhaisRivit} piiriä)
+Paketit: ${paketit} kpl (${pakettiRivit} pakettia)
+Heittolaatikot: ${dLkm} kpl (${dRivit} nippua)
+KAIKKI YHTEENSÄ: ${total} kpl`;
 
-	  output += `\n*** HUOM! YHTEISMÄÄRÄ EI SISÄLLÄ ULKOMAAN MÄÄRIÄ. ***\n`;
+const huomio = "\n\nHUOM! MÄÄRÄ EI SISÄLLÄ ULKOMAAN MÄÄRIÄ JOS NE ON POISTETTU TIEDOSTOSTA!\n";
 
 
-      document.getElementById("result").textContent = output.trim();
+      document.getElementById("output").textContent = output + huomio;
     }
 
+    function clearText() {
+      document.getElementById("textInput").value = "";
+      document.getElementById("output").textContent = "";
+    }
+
+    // PDF yhdistäjä
     const dropArea = document.getElementById('drop-area');
     const fileElem = document.getElementById('fileElem');
     const mergeBtn = document.getElementById('merge-btn');
     let pdfFiles = [];
 
     dropArea.addEventListener('click', () => fileElem.click());
-
     dropArea.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropArea.style.backgroundColor = '#e0e0ff';
     });
-
     dropArea.addEventListener('dragleave', () => {
       dropArea.style.backgroundColor = 'white';
     });
-
     dropArea.addEventListener('drop', (e) => {
       e.preventDefault();
       dropArea.style.backgroundColor = 'white';
       handleFiles(e.dataTransfer.files);
     });
-
     fileElem.addEventListener('change', () => {
       handleFiles(fileElem.files);
     });
@@ -216,6 +208,7 @@
       }
 
       const mergedPdfBytes = await mergedPdf.save();
+
       const blob = new Blob([mergedPdfBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -230,4 +223,5 @@
     });
   </script>
 </body>
+
 </html>
