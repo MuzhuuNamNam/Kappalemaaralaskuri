@@ -48,6 +48,25 @@
   <div id="drop-text">Pudota tekstitiedosto tähän tai klikkaa valitaksesi</div>
   <input type="file" id="fileInputText" accept=".txt,.001,.000,.log" style="display:none" />
   <textarea id="textInput" placeholder="Liitä tai pudota teksti tähän..."></textarea>
+  <label for="paperSelect" style="display:block; margin: 6px 0 14px 0;">
+    Lehti / formaatti:
+    <select id="paperSelect">
+      <option value="default" selected>Oletus</option>
+      <option value="orimattilan">ORIMATTILAN SANOMAT</option>
+    </select>
+  </label>
+
+  <div id="view-default" style="margin: 10px 0 16px 0; padding: 10px; background:#fff; border-radius:10px; border:1px solid #ddd;">
+    <strong>Oletusnäkymä</strong><br>
+    Käyttää alkuperäisiä varhaisjakelun tunnisteita (KULJETUS KAHMA / KULJETUS JOUTSA) ja hakee kappalemäärän riviltä 4–5-numeroisena lukuna.
+  </div>
+
+  <div id="view-orimattila" style="display:none; margin: 10px 0 16px 0; padding: 10px; background:#fff; border-radius:10px; border:1px solid #ddd;">
+    <strong>ORIMATTILAN SANOMAT -näkymä</strong><br>
+    Varhaisjakelu tunnistetaan koodeilla: <code>A_HAMEENLINNA</code>, <code>HSLAH</code>, <code>J_HA_AU_ME</code>.<br>
+    Varhaisjakelun kappalemäärä luetaan kiinteästä kohdasta: merkistä 50 alkaen (5 merkkiä).
+  </div>
+
   <button onclick="analyzeText()">Laske kappalemäärät</button>
   <button onclick="clearText()">Tyhjennä</button>
 
@@ -80,6 +99,25 @@
       handleTextFile(file);
     });
 
+
+    function updateView() {
+      const mode = document.getElementById("paperSelect")?.value || "default";
+      const def = document.getElementById("view-default");
+      const ori = document.getElementById("view-orimattila");
+      if (!def || !ori) return;
+      if (mode === "orimattilan") {
+        def.style.display = "none";
+        ori.style.display = "block";
+      } else {
+        def.style.display = "block";
+        ori.style.display = "none";
+      }
+    }
+
+    // Päivitä näkymä valinnan mukaan
+    document.getElementById("paperSelect")?.addEventListener("change", updateView);
+    updateView();
+
     function handleTextFile(file) {
       if (file) {
         const reader = new FileReader();
@@ -95,9 +133,11 @@
       }
     }
 
+    
     function analyzeText() {
       const text = document.getElementById("textInput").value;
       const lines = text.split("\n");
+      const mode = document.getElementById("paperSelect")?.value || "default";
 
       let total = 0;
       let osoitteet = 0;
@@ -106,6 +146,39 @@
       let dLkm = 0, dRivit = 0;
 
       let aAloitettu = false;
+
+      // ORIMATTILAN SANOMAT: varhaisjakelun hakuarvot + kappalemäärä kiinteästä kohdasta
+      const orimattilaVarhaisKeys = ["A_HAMEENLINNA", "HSLAH", "J_HA_AU_ME"];
+
+      function parseAmountFromFixedPosition(line) {
+        // "merkistä 50 alkaen (5 merkkiä)" -> 1-based 50 => 0-based index 49, length 5
+        if (!line || line.length < 54) return NaN;
+        const raw = line.substring(49, 54).trim();
+        const num = parseInt(raw, 10);
+        return Number.isFinite(num) ? num : NaN;
+      }
+
+      function parseAmountDefault(line) {
+        // Kappalemäärä etsiminen (4-5 numeroa)
+        const match = line.match(/\b(\d{4,5})\b/);
+        if (!match) return NaN;
+        const num = parseInt(match[1], 10);
+        return Number.isFinite(num) ? num : NaN;
+      }
+
+      function isVarhaisLine(line) {
+        if (mode === "orimattilan") {
+          return orimattilaVarhaisKeys.some(k => line.includes(k));
+        }
+        return (line.includes("KULJETUS KAHMA") || line.includes("KULJETUS JOUTSA"));
+      }
+
+      function parseAmount(line, isVarhais) {
+        if (mode === "orimattilan" && isVarhais) {
+          return parseAmountFromFixedPosition(line);
+        }
+        return parseAmountDefault(line);
+      }
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -120,27 +193,32 @@
         if (line.startsWith("A")) {
           aAloitettu = true;
 
-          // Kappalemäärä etsiminen (4-5 numeroa)
-          const match = line.match(/\b(\d{4,5})\b/);
-          if (!match) continue;
-          const luku = parseInt(match[1]);
+          // Varhaisjakelu
+          if (isVarhaisLine(line)) {
+            const luku = parseAmount(line, true);
+            if (Number.isFinite(luku)) {
+              varhais += luku;
+              varhaisRivit++;
+            }
+            continue;
+          }
 
-          if (line.includes("KULJETUS KAHMA") || line.includes("KULJETUS JOUTSA")) {
-            varhais += luku;
-            varhaisRivit++;
-          } else if (line.includes("PAKETTI")) {
-            paketit += luku;
-            pakettiRivit++;
+          // Paketit (oletuslogiikka)
+          if (line.includes("PAKETTI")) {
+            const luku = parseAmount(line, false);
+            if (Number.isFinite(luku)) {
+              paketit += luku;
+              pakettiRivit++;
+            }
           }
 
           continue;
         }
 
-        // D-rivit A:n jälkeen
+        // D-rivit A:n jälkeen (heittolaatikot / niput) – säilytetään nykyinen logiikka
         if (aAloitettu && line.startsWith("D") && (line.includes("KULJETUS KAHMA") || line.includes("KULJETUS JOUTSA"))) {
-          const match = line.match(/\b(\d{4,5})\b/);
-          if (!match) continue;
-          const luku = parseInt(match[1]);
+          const luku = parseAmountDefault(line);
+          if (!Number.isFinite(luku)) continue;
           dLkm += luku;
           dRivit++;
         }
@@ -154,8 +232,7 @@ Paketit: ${paketit} kpl (${pakettiRivit} pakettia)
 Heittolaatikot: ${dLkm} kpl (${dRivit} nippua)
 KAIKKI YHTEENSÄ: ${total} kpl`;
 
-const huomio = "\n\nHUOM! MÄÄRÄ EI SISÄLLÄ ULKOMAAN MÄÄRIÄ JOS NE ON POISTETTU TIEDOSTOSTA!\n";
-
+      const huomio = "\n\nHUOM! MÄÄRÄ EI SISÄLLÄ ULKOMAAN MÄÄRIÄ JOS NE ON POISTETTU TIEDOSTOSTA!\n";
 
       document.getElementById("output").textContent = output + huomio;
     }
@@ -164,6 +241,7 @@ const huomio = "\n\nHUOM! MÄÄRÄ EI SISÄLLÄ ULKOMAAN MÄÄRIÄ JOS NE ON POI
       document.getElementById("textInput").value = "";
       document.getElementById("output").textContent = "";
     }
+
 
     // PDF yhdistäjä
     const dropArea = document.getElementById('drop-area');
