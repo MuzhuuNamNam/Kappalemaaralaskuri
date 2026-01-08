@@ -63,7 +63,7 @@
 
   <div id="view-orimattila" style="display:none; margin: 10px 0 16px 0; padding: 10px; background:#fff; border-radius:10px; border:1px solid #ddd;">
     <strong>ORIMATTILAN SANOMAT -näkymä</strong><br>
-    Varhaisjakelu tunnistetaan koodeilla: <code>A_HAMEENLINNA</code>, <code>HSLAH</code>, <code>J_HA_AU_ME</code>.<br>
+    Varhaisjakelu tunnistetaan koodeilla: <code>LAMM</code>, <code>ORIM</code>, <code>SALP</code>, <code>HA1</code>, <code>PUH</code>.<br>
     Varhaisjakelun kappalemäärä luetaan kiinteästä kohdasta: merkistä 50 alkaen (5 merkkiä).
   </div>
 
@@ -148,7 +148,7 @@
       let aAloitettu = false;
 
       // ORIMATTILAN SANOMAT: varhaisjakelun hakuarvot + kappalemäärä kiinteästä kohdasta
-      const orimattilaVarhaisKeys = ["A_HAMEENLINNA", "HSLAH", "J_HA_AU_ME"];
+      const orimattilaVarhaisKeys = ["LAMM", "ORIM", "SALP", "HA1", "PUH"];
 
       function parseAmountFromFixedPosition(line) {
         // "merkistä 50 alkaen (5 merkkiä)" -> 1-based 50 => 0-based index 49, length 5
