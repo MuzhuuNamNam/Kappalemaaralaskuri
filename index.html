@@ -5,31 +5,38 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="C:\Users\talvijon\WEBsovellukset\TEKSTILUVUKSI">
   <link rel="apple-touch-icon" href="C:\Users\talvijon\WEBsovellukset\TEKSTILUVUKSI">
-
-  <title>Kappalemäärän laskuri & PDF-yhdistäjä</title>
+  <title>Kappalemäärän laskuri, PDF-yhdistäjä & osoitetarrat PDF:ksi</title>
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
       background: beige;
       padding: 20px;
+      color: #222;
+    }
+    h1, h2, h3 {
+      margin-top: 0;
     }
     textarea {
       width: 100%;
       height: 200px;
       font-size: 16px;
       margin-bottom: 10px;
+      box-sizing: border-box;
     }
     button {
       margin-right: 10px;
       padding: 10px 20px;
       font-size: 16px;
+      cursor: pointer;
     }
     pre {
       background: #eee;
       padding: 10px;
+      white-space: pre-wrap;
     }
-    #drop-area, #drop-text {
+    .drop-zone {
       border: 2px dashed #007bff;
       border-radius: 10px;
       padding: 20px;
@@ -39,48 +46,181 @@
       color: #007bff;
       cursor: pointer;
     }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .tab-button {
+      border: 1px solid #b8b2a0;
+      background: #f7f1df;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 15px;
+    }
+    .tab-button.active {
+      background: #fff;
+      border-color: #8f8570;
+      font-weight: 700;
+    }
+    .tab-panel {
+      display: none;
+      background: #fdfaf1;
+      border: 1px solid #d8d0bd;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .info-box {
+      margin: 10px 0 16px 0;
+      padding: 10px;
+      background:#fff;
+      border-radius:10px;
+      border:1px solid #ddd;
+    }
+    .address-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px 16px;
+      margin: 14px 0;
+    }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-group label {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .field-group input, .field-group select {
+      padding: 8px 10px;
+      font-size: 15px;
+      border-radius: 8px;
+      border: 1px solid #bbb;
+      box-sizing: border-box;
+    }
+    .hint {
+      font-size: 14px;
+      color: #555;
+    }
+    .success {
+      color: #0a6b2d;
+      font-weight: 600;
+    }
+    .warning {
+      color: #8a5c00;
+      font-weight: 600;
+    }
+    .muted {
+      color: #666;
+    }
   </style>
 </head>
 
 <body>
-  <h1>Kappalemäärän laskuri & PDF-yhdistäjä</h1>
+  <h1>Kappalemäärän laskuri, PDF-yhdistäjä & osoitetarrat</h1>
 
-  <div id="drop-text">Pudota tekstitiedosto tähän tai klikkaa valitaksesi</div>
-  <input type="file" id="fileInputText" accept=".txt,.001,.000,.log" style="display:none" />
-  <textarea id="textInput" placeholder="Liitä tai pudota teksti tähän..."></textarea>
-  <label for="paperSelect" style="display:block; margin: 6px 0 14px 0;">
-    Lehti / formaatti:
-    <select id="paperSelect">
-      <option value="default" selected>Oletus</option>
-      <option value="orimattilan">ORIMATTILAN SANOMAT</option>
-    </select>
-  </label>
-
-  <div id="view-default" style="margin: 10px 0 16px 0; padding: 10px; background:#fff; border-radius:10px; border:1px solid #ddd;">
-    <strong>Oletusnäkymä</strong><br>
-    Käyttää alkuperäisiä varhaisjakelun tunnisteita (KULJETUS KAHMA / KULJETUS JOUTSA) ja hakee kappalemäärän riviltä 4–5-numeroisena lukuna.
+  <div class="tabs">
+    <button class="tab-button active" data-tab="tab-counter">Kappalemäärän laskuri</button>
+    <button class="tab-button" data-tab="tab-merge">PDF-yhdistäjä</button>
+    <button class="tab-button" data-tab="tab-labels">Excel → osoitetarrat PDF</button>
   </div>
 
-  <div id="view-orimattila" style="display:none; margin: 10px 0 16px 0; padding: 10px; background:#fff; border-radius:10px; border:1px solid #ddd;">
-    <strong>ORIMATTILAN SANOMAT -näkymä</strong><br>
-    Varhaisjakelu tunnistetaan koodeilla: <code>LAMM</code>, <code>ORIM</code>, <code>SALP</code>, <code>HA1</code>, <code>PUH</code>.<br>
-    Varhaisjakelun kappalemäärä luetaan kiinteästä kohdasta: merkistä 50 alkaen (5 merkkiä).
-  </div>
+  <section id="tab-counter" class="tab-panel active">
+    <div id="drop-text" class="drop-zone">Pudota tekstitiedosto tähän tai klikkaa valitaksesi</div>
+    <input type="file" id="fileInputText" accept=".txt,.001,.000,.log" style="display:none" />
+    <textarea id="textInput" placeholder="Liitä tai pudota teksti tähän..."></textarea>
+    <label for="paperSelect" style="display:block; margin: 6px 0 14px 0;">
+      Lehti / formaatti:
+      <select id="paperSelect">
+        <option value="default" selected>Oletus</option>
+        <option value="orimattilan">ORIMATTILAN SANOMAT</option>
+      </select>
+    </label>
 
-  <button onclick="analyzeText()">Laske kappalemäärät</button>
-  <button onclick="clearText()">Tyhjennä</button>
+    <div id="view-default" class="info-box">
+      <strong>Oletusnäkymä</strong><br>
+      Käyttää alkuperäisiä varhaisjakelun tunnisteita (KULJETUS KAHMA / KULJETUS JOUTSA) ja hakee kappalemäärän riviltä 4–5-numeroisena lukuna.
+    </div>
 
-  <pre id="output"></pre>
+    <div id="view-orimattila" class="info-box" style="display:none;">
+      <strong>ORIMATTILAN SANOMAT -näkymä</strong><br>
+      Varhaisjakelu tunnistetaan koodeilla: <code>LAMM</code>, <code>ORIM</code>, <code>SALP</code>, <code>HA1</code>, <code>PUH</code>.<br>
+      Varhaisjakelun kappalemäärä luetaan kiinteästä kohdasta: merkistä 50 alkaen (5 merkkiä).
+    </div>
 
-  <hr>
+    <button onclick="analyzeText()">Laske kappalemäärät</button>
+    <button onclick="clearText()">Tyhjennä</button>
 
-  <h2>PDF-yhdistäjä</h2>
-  <div id="drop-area">Klikkaa tai pudota PDF-tiedostoja tähän
-    <input type="file" id="fileElem" multiple accept="application/pdf" style="display:none" />
-  </div>
-  <button id="merge-btn" disabled>Yhdistä PDF-tiedostot</button>
+    <pre id="output"></pre>
+  </section>
+
+  <section id="tab-merge" class="tab-panel">
+    <h2>PDF-yhdistäjä</h2>
+    <div id="drop-area" class="drop-zone">Klikkaa tai pudota PDF-tiedostoja tähän
+      <input type="file" id="fileElem" multiple accept="application/pdf" style="display:none" />
+    </div>
+    <button id="merge-btn" disabled>Yhdistä PDF-tiedostot</button>
+  </section>
+
+  <section id="tab-labels" class="tab-panel">
+    <h2>Excel → osoitetarrat PDF</h2>
+    <p class="hint">Lataa Excel-tiedosto (.xlsx tai .xls). Tiedot asetellaan 24 osoitteen A4-tarra-arkille liitteesi mukaisiin kohtiin.</p>
+
+    <div id="drop-address" class="drop-zone">Klikkaa tai pudota Excel-tiedosto tähän
+      <input type="file" id="addressFileInput" accept=".xlsx,.xls" style="display:none" />
+    </div>
+
+    <div class="address-grid">
+      <div class="field-group">
+        <label for="sheetSelect">Välilehti</label>
+        <select id="sheetSelect" disabled>
+          <option>Valitse ensin Excel-tiedosto</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="startRowInput">Aloitusrivi</label>
+        <input id="startRowInput" type="number" min="1" value="1" />
+      </div>
+      <div class="field-group">
+        <label for="fontSizeInput">Fonttikoko</label>
+        <input id="fontSizeInput" type="number" min="7" max="14" value="10" />
+      </div>
+      <div class="field-group">
+        <label for="fileNameInput">Tallennusnimi</label>
+        <input id="fileNameInput" type="text" value="osoitetarrat.pdf" />
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>Tulkinta:</strong><br>
+      4 saraketta = jokainen ei-tyhjä sarake omalle rivilleen.<br>
+      5 saraketta = sarakkeet A–C omille riveilleen ja D + E yhdistetään samalle riville.<br>
+      Tyhjät solut ohitetaan automaattisesti.<br>Jokainen tulostettava rivi katkaistaan automaattisesti enintään 35 merkkiin.
+    </div>
+
+    <button id="generateAddressPdfBtn" disabled>Luo PDF</button>
+    <button id="clearAddressBtn" disabled>Tyhjennä Excel-valinta</button>
+
+    <pre id="addressOutput">Ei tiedostoa valittuna.</pre>
+  </section>
 
   <script>
+    // Välilehdet
+    document.querySelectorAll('.tab-button').forEach(button => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+        button.classList.add('active');
+        document.getElementById(button.dataset.tab).classList.add('active');
+      });
+    });
+
     const textDrop = document.getElementById('drop-text');
     const fileInputText = document.getElementById('fileInputText');
 
@@ -99,7 +239,6 @@
       handleTextFile(file);
     });
 
-
     function updateView() {
       const mode = document.getElementById("paperSelect")?.value || "default";
       const def = document.getElementById("view-default");
@@ -114,9 +253,15 @@
       }
     }
 
-    // Päivitä näkymä valinnan mukaan
     document.getElementById("paperSelect")?.addEventListener("change", updateView);
     updateView();
+    
+    // Rivien max pituus 35 merkkiä
+    function trimLine(text, maxLength = 30) {
+      if (!text) return "";
+      const normalized = String(text).replace(/\s+/g, ' ').trim();
+      return normalized.length > maxLength ? normalized.substring(0, maxLength) : normalized;
+    }
 
     function handleTextFile(file) {
       if (file) {
@@ -133,7 +278,6 @@
       }
     }
 
-    
     function analyzeText() {
       const text = document.getElementById("textInput").value;
       const lines = text.split("\n");
@@ -147,11 +291,9 @@
 
       let aAloitettu = false;
 
-      // ORIMATTILAN SANOMAT: varhaisjakelun hakuarvot + kappalemäärä kiinteästä kohdasta
       const orimattilaVarhaisKeys = ["LAMM", "ORIM", "SALP", "HA1", "PUH"];
 
       function parseAmountFromFixedPosition(line) {
-        // "merkistä 50 alkaen (5 merkkiä)" -> 1-based 50 => 0-based index 49, length 5
         if (!line || line.length < 54) return NaN;
         const raw = line.substring(49, 54).trim();
         const num = parseInt(raw, 10);
@@ -159,7 +301,6 @@
       }
 
       function parseAmountDefault(line) {
-        // Kappalemäärä etsiminen (4-5 numeroa)
         const match = line.match(/\b(\d{4,5})\b/);
         if (!match) return NaN;
         const num = parseInt(match[1], 10);
@@ -183,17 +324,14 @@
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
-        // Osoitteiden yhteismäärä E ennen ensimmäistä A-riviä
         if (!aAloitettu && line.startsWith("E")) {
           osoitteet++;
           continue;
         }
 
-        // A-tunniste alkaa, ei lasketa E enää
         if (line.startsWith("A")) {
           aAloitettu = true;
 
-          // Varhaisjakelu
           if (isVarhaisLine(line)) {
             const luku = parseAmount(line, true);
             if (Number.isFinite(luku)) {
@@ -203,7 +341,6 @@
             continue;
           }
 
-          // Paketit (oletuslogiikka)
           if (line.includes("PAKETTI")) {
             const luku = parseAmount(line, false);
             if (Number.isFinite(luku)) {
@@ -215,7 +352,6 @@
           continue;
         }
 
-        // D-rivit A:n jälkeen (heittolaatikot / niput) – säilytetään nykyinen logiikka
         if (aAloitettu && line.startsWith("D") && (line.includes("KULJETUS KAHMA") || line.includes("KULJETUS JOUTSA"))) {
           const luku = parseAmountDefault(line);
           if (!Number.isFinite(luku)) continue;
@@ -241,7 +377,6 @@ KAIKKI YHTEENSÄ: ${total} kpl`;
       document.getElementById("textInput").value = "";
       document.getElementById("output").textContent = "";
     }
-
 
     // PDF yhdistäjä
     const dropArea = document.getElementById('drop-area');
@@ -274,7 +409,7 @@ KAIKKI YHTEENSÄ: ${total} kpl`;
       }
       if (pdfFiles.length > 0) {
         mergeBtn.disabled = false;
-        dropArea.textContent = `${pdfFiles.length} PDF-tiedosto(a) valittu`;
+        dropArea.childNodes[0].textContent = `${pdfFiles.length} PDF-tiedosto(a) valittu`;
       }
     }
 
@@ -299,8 +434,222 @@ KAIKKI YHTEENSÄ: ${total} kpl`;
       URL.revokeObjectURL(url);
 
       pdfFiles = [];
-      dropArea.textContent = "Klikkaa tai pudota PDF-tiedostoja tähän";
+      dropArea.childNodes[0].textContent = "Klikkaa tai pudota PDF-tiedostoja tähän";
       mergeBtn.disabled = true;
+    });
+
+    // Excel -> osoitetarrat PDF
+    const addressDrop = document.getElementById('drop-address');
+    const addressFileInput = document.getElementById('addressFileInput');
+    const sheetSelect = document.getElementById('sheetSelect');
+    const generateAddressPdfBtn = document.getElementById('generateAddressPdfBtn');
+    const clearAddressBtn = document.getElementById('clearAddressBtn');
+    const addressOutput = document.getElementById('addressOutput');
+
+    const LABEL_TEMPLATE = {
+      pageWidth: 595.28,
+      pageHeight: 841.89,
+      columns: 3,
+      rows: 8,
+      labelsPerPage: 24,
+      xPositions: [10.01, 215.43, 413.86],
+      yPositionsTop: [32.51, 137.39, 242.27, 347.16, 452.04, 565.42, 675.98, 789.36],
+      lineGap: 10,
+      maxLines: 4
+    };
+
+    let addressWorkbook = null;
+    let addressFileName = '';
+
+    addressDrop.addEventListener('click', () => addressFileInput.click());
+    addressDrop.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      addressDrop.style.backgroundColor = '#e0e0ff';
+    });
+    addressDrop.addEventListener('dragleave', () => {
+      addressDrop.style.backgroundColor = 'white';
+    });
+    addressDrop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      addressDrop.style.backgroundColor = 'white';
+      const file = e.dataTransfer.files[0];
+      handleAddressFile(file);
+    });
+    addressFileInput.addEventListener('change', () => {
+      const file = addressFileInput.files[0];
+      handleAddressFile(file);
+    });
+
+    clearAddressBtn.addEventListener('click', clearAddressSelection);
+
+    function clearAddressSelection() {
+      addressWorkbook = null;
+      addressFileName = '';
+      addressFileInput.value = '';
+      sheetSelect.innerHTML = '<option>Valitse ensin Excel-tiedosto</option>';
+      sheetSelect.disabled = true;
+      generateAddressPdfBtn.disabled = true;
+      clearAddressBtn.disabled = true;
+      addressDrop.childNodes[0].textContent = 'Klikkaa tai pudota Excel-tiedosto tähän';
+      addressOutput.textContent = 'Ei tiedostoa valittuna.';
+    }
+
+    async function handleAddressFile(file) {
+      if (!file) return;
+      const isExcel = /\.xlsx?$|\.xls$/i.test(file.name);
+      if (!isExcel) {
+        alert('Valitse Excel-tiedosto (.xlsx tai .xls).');
+        return;
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      addressWorkbook = XLSX.read(arrayBuffer, { type: 'array' });
+      addressFileName = file.name;
+      addressDrop.childNodes[0].textContent = `Valittu: ${file.name}`;
+
+      sheetSelect.innerHTML = '';
+      addressWorkbook.SheetNames.forEach((name, index) => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        if (index === 0) option.selected = true;
+        sheetSelect.appendChild(option);
+      });
+
+      sheetSelect.disabled = false;
+      generateAddressPdfBtn.disabled = false;
+      clearAddressBtn.disabled = false;
+      updateAddressSummary();
+    }
+
+    sheetSelect.addEventListener('change', updateAddressSummary);
+    document.getElementById('startRowInput').addEventListener('input', updateAddressSummary);
+
+    function normalizeCellValue(value) {
+      if (value === null || value === undefined) return '';
+      return String(value).trim();
+    }
+
+    function getActiveSheetRows() {
+      if (!addressWorkbook) return [];
+      const sheet = addressWorkbook.Sheets[sheetSelect.value];
+      if (!sheet) return [];
+      return XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: '' });
+    }
+
+    function rowToAddressLines(row) {
+      const cells = row.map(normalizeCellValue);
+      while (cells.length > 0 && cells[cells.length - 1] === '') {
+        cells.pop();
+      }
+      if (cells.length === 0) return [];
+
+      const hasFiveColumns = cells.length >= 5 && cells[4] !== '';
+      const lines = [];
+
+      if (cells[0]) lines.push(trimLine(cells[0]));
+      if (cells[1]) lines.push(trimLine(cells[1]));
+      if (cells[2]) lines.push(trimLine(cells[2]));
+
+      if (hasFiveColumns) {
+        const combined = trimLine([cells[3], cells[4]].filter(Boolean).join(' '));
+        if (combined) lines.push(combined);
+      } else {
+        for (let i = 3; i < cells.length; i++) {
+          if (cells[i]) lines.push(trimLine(cells[i]));
+        }
+      }
+
+      return lines.slice(0, LABEL_TEMPLATE.maxLines);
+    }
+
+    function getPreparedAddresses() {
+      const startRow = Math.max(parseInt(document.getElementById('startRowInput').value || '1', 10), 1);
+      const allRows = getActiveSheetRows();
+      const rows = allRows.slice(startRow - 1);
+
+      const prepared = [];
+      rows.forEach((row, index) => {
+        const lines = rowToAddressLines(Array.isArray(row) ? row : []);
+        if (lines.length > 0) {
+          prepared.push({
+            sourceRowNumber: startRow + index,
+            lines
+          });
+        }
+      });
+
+      return { prepared, totalRows: allRows.length, startRow };
+    }
+
+    function updateAddressSummary() {
+      if (!addressWorkbook) return;
+
+      const { prepared, totalRows, startRow } = getPreparedAddresses();
+      const pages = Math.ceil(prepared.length / LABEL_TEMPLATE.labelsPerPage) || 0;
+      const preview = prepared.slice(0, 3).map(item => {
+        return `Rivi ${item.sourceRowNumber}: ${item.lines.join(' | ')}`;
+      }).join('\n');
+
+      addressOutput.textContent =
+        `Tiedosto: ${addressFileName}
+Välilehti: ${sheetSelect.value}
+Lähtörivi: ${startRow}
+Excel-rivejä yhteensä: ${totalRows}
+Tulostettavia osoitteita: ${prepared.length}
+Arvioitu sivumäärä: ${pages}
+
+Esikatselu:
+${preview || 'Ei tulostettavia osoitteita valitulla lähtörivillä.'}`;
+    }
+
+    function drawAddressBlock(page, font, fontSize, x, topY, lines) {
+      lines.forEach((line, index) => {
+        const y = LABEL_TEMPLATE.pageHeight - topY - ((index + 1) * LABEL_TEMPLATE.lineGap);
+        page.drawText(line, {
+          x,
+          y,
+          size: fontSize,
+          font
+        });
+      });
+    }
+
+    generateAddressPdfBtn.addEventListener('click', async () => {
+      if (!addressWorkbook) return;
+
+      const { prepared } = getPreparedAddresses();
+      if (prepared.length === 0) {
+        alert('Valitulla välilehdellä ei ole tulostettavia osoiterivejä.');
+        return;
+      }
+
+      const fontSize = Math.max(7, Math.min(14, parseFloat(document.getElementById('fontSizeInput').value || '10')));
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
+      for (let offset = 0; offset < prepared.length; offset += LABEL_TEMPLATE.labelsPerPage) {
+        const page = pdfDoc.addPage([LABEL_TEMPLATE.pageWidth, LABEL_TEMPLATE.pageHeight]);
+        const chunk = prepared.slice(offset, offset + LABEL_TEMPLATE.labelsPerPage);
+
+        chunk.forEach((address, index) => {
+          const column = index % LABEL_TEMPLATE.columns;
+          const row = Math.floor(index / LABEL_TEMPLATE.columns);
+          const x = LABEL_TEMPLATE.xPositions[column];
+          const topY = LABEL_TEMPLATE.yPositionsTop[row];
+          drawAddressBlock(page, font, fontSize, x, topY, address.lines);
+        });
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const fileName = (document.getElementById('fileNameInput').value || 'osoitetarrat.pdf').trim();
+      a.href = url;
+      a.download = fileName.toLowerCase().endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     });
   </script>
 </body>
