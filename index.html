@@ -36,6 +36,10 @@
       padding: 10px;
       white-space: pre-wrap;
     }
+    #addressOutput {
+      white-space: pre;
+      overflow-x: auto;
+    }
     .drop-zone {
       border: 2px dashed #007bff;
       border-radius: 10px;
@@ -452,7 +456,7 @@ KAIKKI YHTEENSÄ: ${total} kpl`;
       columns: 3,
       rows: 8,
       labelsPerPage: 24,
-      xPositions: [10.01, 215.43, 413.86],
+      xPositions: [17.01, 215.43, 413.86],
       yPositionsTop: [32.51, 137.39, 242.27, 347.16, 452.04, 565.42, 675.98, 789.36],
       lineGap: 10,
       maxLines: 4
@@ -582,13 +586,21 @@ KAIKKI YHTEENSÄ: ${total} kpl`;
       return { prepared, totalRows: allRows.length, startRow };
     }
 
+    function formatPreviewLine(lines) {
+      const targetWidth = 38;
+      return lines.map(line => {
+        const value = String(line || '');
+        return value.length < targetWidth ? value.padEnd(targetWidth, ' ') : value;
+      }).join(' | ');
+    }
+
     function updateAddressSummary() {
       if (!addressWorkbook) return;
 
       const { prepared, totalRows, startRow } = getPreparedAddresses();
       const pages = Math.ceil(prepared.length / LABEL_TEMPLATE.labelsPerPage) || 0;
-      const preview = prepared.slice(0, 3).map(item => {
-        return `Rivi ${item.sourceRowNumber}: ${item.lines.join(' | ')}`;
+      const preview = prepared.slice(0, 50).map(item => {
+        return `Rivi ${item.sourceRowNumber}: ${formatPreviewLine(item.lines)}`;
       }).join('\n');
 
       addressOutput.textContent =
