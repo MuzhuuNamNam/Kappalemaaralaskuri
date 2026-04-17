@@ -169,6 +169,7 @@
     <div id="drop-area" class="drop-zone">Klikkaa tai pudota PDF-tiedostoja tähän
       <input type="file" id="fileElem" multiple accept="application/pdf" style="display:none" />
     </div>
+    <div id="pdfList"></div>
     <button id="merge-btn" disabled>Yhdistä PDF-tiedostot</button>
   </section>
 
@@ -414,18 +415,69 @@ KAIKKI YHTEENSÄ: ${total} kpl`;
       if (pdfFiles.length > 0) {
         mergeBtn.disabled = false;
         dropArea.childNodes[0].textContent = `${pdfFiles.length} PDF-tiedosto(a) valittu`;
+        renderPdfList();
       }
+    }
+
+    
+    const pdfListDiv = document.getElementById('pdfList');
+
+    function renderPdfList() {
+      pdfListDiv.innerHTML = '';
+      pdfFiles.forEach((file, index) => {
+        const div = document.createElement('div');
+        div.style.marginBottom = '8px';
+        div.innerHTML = `
+          <strong>${file.name}</strong> → poista 
+          <input type="text" data-index="${index}" placeholder="esim. 2,4,6-8" style="width:120px;">
+        `;
+        pdfListDiv.appendChild(div);
+      });
+    }
+
+    function parsePages(input) {
+      if (!input) return [];
+      const parts = input.split(',');
+      const pages = new Set();
+
+      parts.forEach(p => {
+        if (p.includes('-')) {
+          const [start, end] = p.split('-').map(Number);
+          for (let i = start; i <= end; i++) pages.add(i);
+        } else {
+          const num = Number(p);
+          if (!isNaN(num)) pages.add(num);
+        }
+      });
+
+      return Array.from(pages);
     }
 
     mergeBtn.addEventListener('click', async () => {
       const mergedPdf = await PDFLib.PDFDocument.create();
 
-      for (const file of pdfFiles) {
+      
+      const inputs = document.querySelectorAll('#pdfList input');
+
+      for (let i = 0; i < pdfFiles.length; i++) {
+        const file = pdfFiles[i];
+        const removeInput = inputs[i]?.value || '';
+        const removePages = parsePages(removeInput);
+
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
+
+        const totalPages = pdf.getPageCount();
+        const keepPages = [];
+
+        for (let p = 1; p <= totalPages; p++) {
+          if (!removePages.includes(p)) keepPages.push(p - 1);
+        }
+
+        const copiedPages = await mergedPdf.copyPages(pdf, keepPages);
+        copiedPages.forEach(page => mergedPdf.addPage(page));
       }
+
 
       const mergedPdfBytes = await mergedPdf.save();
 
